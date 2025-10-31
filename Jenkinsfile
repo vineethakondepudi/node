@@ -14,90 +14,33 @@ pipeline {
                 checkout scm
             }
         }
-
-        stage('Validate') {
-            steps {
-                echo "Validating Node environment..."
-                sh 'node -v'
-                sh 'npm -v'
-                sh 'npm install --quiet'
-            }
-        }
-
+   // Builds the source code 
         stage('Build') {
             steps {
-                echo "Building Node.js application..."
-                // If you have a build script in package.json
-                sh 'npm run build || echo "No build script found, skipping..."'
+                sh 'mvn clean install -DskipTests'
             }
-        }
-
-        stage('Test') {
-            steps {
-                echo "Running unit tests..."
-                // Skip this if you have no tests yet
-                sh 'npm test || echo "No tests configured, skipping..."'
-            }
-        }
-
-        stage('Lint or Checkstyle') {
-            steps {
-                echo "Running lint analysis..."
-                sh 'npm run lint || echo "No lint script configured, skipping..."'
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    echo "Building Docker image..."
-                    dockerImage = docker.build("${registry}:${appVersion}")
+            post {
+                success {
+                    echo "Now Archiving."
+                    archiveArtifacts artifacts: '**/*.war'
                 }
             }
         }
-
-        stage('Push Docker Image') {
+        // Test the source code using Maven
+        stage('Test'){
             steps {
-                script {
-                    echo "Pushing Docker image to registry..."
-                    docker.withRegistry('', registryCredential) {
-                        dockerImage.push("${appVersion}")
-                        dockerImage.push("latest")
-                    }
-                }
+                sh 'mvn test'
             }
-        }
 
-        stage('Clean Docker Images') {
-            steps {
-                sh "docker rmi ${registry}:${appVersion} || true"
-            }
         }
-
-        stage('Deploy to Kubernetes') {
+        // Test the code quality using checkstyle analysis
+        stage('Checkstyle Analysis'){
             steps {
-                echo "Deploying to Kubernetes using Helm..."
-                // The namespace must exist
-                sh "helm upgrade --install node-app ./helm/nodechart --set image.repository=${registry} --set image.tag=${appVersion} --namespace prod"
+                sh 'mvn checkstyle:checkstyle'
             }
         }
     }
-
-    post {
-        success {
-            echo "✅ Build and deployment successful!"
-        }
-        failure {
-            echo "❌ Build or deployment failed."
-        }
-    }
-}
-
-
-
-
-
-
+       
 
 // pipeline {
 //     agent any
