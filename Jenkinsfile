@@ -3,8 +3,9 @@ pipeline {
 
     environment {
         registry = "vineethakondepudi/node-k8s-app"   // your Docker image name
-        registryCredential = "dockerhub-cred-id"          // your Jenkins DockerHub credentials ID
+        registryCredential = "dockerhub-cred-id"      // your Jenkins DockerHub credentials ID
         appVersion = "${BUILD_NUMBER}"
+        containerName = "node-k8s-container"
     }
 
     stages {
@@ -14,7 +15,8 @@ pipeline {
                 checkout scm
             }
         }
-   // Builds the source code 
+
+        // Build the source code
         stage('Build') {
             steps {
                 sh 'mvn clean install -DskipTests'
@@ -26,26 +28,29 @@ pipeline {
                 }
             }
         }
+
         // Test the source code using Maven
-        stage('Test'){
+        stage('Test') {
             steps {
                 sh 'mvn test'
             }
-
         }
-        // Test the code quality using checkstyle analysis
-        stage('Checkstyle Analysis'){
+
+        // Code quality checkstyle analysis
+        stage('Checkstyle Analysis') {
             steps {
                 sh 'mvn checkstyle:checkstyle'
             }
         }
-          //Builds the docker app image and assigns a tag
-               stage('Building image') {
+
+        // Build Docker image
+        stage('Building image') {
             steps {
                 sh "docker build -t ${registry}:${BUILD_NUMBER} ."
             }
         }
 
+        // Push Docker image to Docker Hub
         stage('Upload Image') {
             steps {
                 withCredentials([usernamePassword(credentialsId: registryCredential, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
@@ -59,15 +64,46 @@ pipeline {
             }
         }
 
-        stage('Remove Unused docker image') {
+        // ✅ Run container from pushed image
+        stage('Run Container') {
             steps {
-                sh "docker rmi ${registry}:${BUILD_NUMBER} || true"
+                script {
+                    echo "Running container from ${registry}:${BUILD_NUMBER}"
+                    // Stop old container if running
+                    sh "docker ps -q --filter name=${containerName} | grep -q . && docker stop ${containerName} && docker rm ${containerName} || true"
+                    
+                    // Run new container
+                    sh "docker run -d --name ${containerName} -p 3000:3000 ${registry}:${BUILD_NUMBER}"
+
+                    // Wait for it to start and verify it responds
+                    sh "sleep 10"
+                    sh "curl -f http://localhost:3000 || echo '⚠️ Container did not respond yet.'"
+
+                    echo "✅ Container is running successfully!"
+                }
             }
         }
 
+        // Cleanup image to save space
+        stage('Remove Unused docker image') {
+            steps {
+                sh "docker stop ${containerName} || true"
+                sh "docker rm ${containerName} || true"
+                sh "docker rmi ${registry}:${BUILD_NUMBER} || true"
+            }
+        }
+    }
 
+    post {
+        success {
+            echo "✅ Build, Push, and Run completed successfully!"
+        }
+        failure {
+            echo "❌ Something went wrong in the pipeline."
+        }
     }
 }
+
 // pipeline {
 //     agent any
 //     tools {
