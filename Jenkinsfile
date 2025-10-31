@@ -39,6 +39,32 @@ pipeline {
                 sh 'mvn checkstyle:checkstyle'
             }
         }
+          //Builds the docker app image and assigns a tag
+        stage('Building image') {
+            steps{
+              script {
+                dockerImage = docker.build registry + ":$BUILD_NUMBER"
+              }
+            }
+        }
+        // Uploads the built image to dockerhub
+        stage('Upload Image') {
+          steps{
+            script {
+              docker.withRegistry( '', registryCredential ) {
+                dockerImage.push("$BUILD_NUMBER")
+                dockerImage.push('latest')
+              }
+            }
+          }
+        }
+        // Removes the unused docker image to clean up disk space
+        stage('Remove Unused docker image') {
+          steps{
+            sh "docker rmi $registry:$BUILD_NUMBER"
+          }
+        }
+
     }
 }
 // pipeline {
