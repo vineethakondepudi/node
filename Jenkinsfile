@@ -40,30 +40,31 @@ pipeline {
             }
         }
           //Builds the docker app image and assigns a tag
-        stage('Building image') {
-            steps{
-              script {
-                dockerImage = docker.build registry + ":$BUILD_NUMBER"
-              }
+               stage('Building image') {
+            steps {
+                sh "docker build -t ${registry}:${BUILD_NUMBER} ."
             }
         }
-        // Uploads the built image to dockerhub
+
         stage('Upload Image') {
-          steps{
-            script {
-              docker.withRegistry( '', registryCredential ) {
-                dockerImage.push("$BUILD_NUMBER")
-                dockerImage.push('latest')
-              }
+            steps {
+                withCredentials([usernamePassword(credentialsId: registryCredential, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh """
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push ${registry}:${BUILD_NUMBER}
+                        docker tag ${registry}:${BUILD_NUMBER} ${registry}:latest
+                        docker push ${registry}:latest
+                    """
+                }
             }
-          }
         }
-        // Removes the unused docker image to clean up disk space
+
         stage('Remove Unused docker image') {
-          steps{
-            sh "docker rmi $registry:$BUILD_NUMBER"
-          }
+            steps {
+                sh "docker rmi ${registry}:${BUILD_NUMBER} || true"
+            }
         }
+
 
     }
 }
