@@ -5,7 +5,7 @@ pipeline {
         registry = "vineethakondepudi/node-k8s-app"   // Docker image name
         registryCredential = "dockerhub-cred-id"      // Jenkins DockerHub credentials ID
         appVersion = "${BUILD_NUMBER}"
-        containerPort = "8080"                        // Port your app runs on
+        containerPort = "8001"                        // Port your app runs on
     }
 
     stages {
@@ -68,7 +68,7 @@ pipeline {
 
                     // Run new container in detached mode
                     sh """
-                        docker run -d --name node-app-container -p ${containerPort}:${containerPort} ${registry}:${BUILD_NUMBER}
+                        docker run -d --name node-app-container -p ${containerPort}:8080 ${registry}:${BUILD_NUMBER}
                     """
 
                     // Wait a bit for startup
