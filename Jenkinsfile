@@ -73,7 +73,7 @@ pipeline {
                     sh "docker ps -q --filter name=${containerName} | grep -q . && docker stop ${containerName} && docker rm ${containerName} || true"
                     
                     // Run new container
-                    sh "docker run -d --name ${containerName} -p 3000:3000 ${registry}:${BUILD_NUMBER}"
+                    sh "docker run -d --name ${containerName} -p 3000:80 ${registry}:${BUILD_NUMBER}"
 
                     // Wait for it to start and verify it responds
                     sh "sleep 10"
